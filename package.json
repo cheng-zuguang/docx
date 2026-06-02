@@ -1,5 +1,5 @@
 {
-  "name": "@cheng-zuguang/docx",
+  "name": "@chengzg/docx",
   "version": "0.1.0",
   "description": "Go CLI for creating and maintaining AI-readable project context.",
   "license": "MIT",
