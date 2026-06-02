@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docx.local/schemas/v1/index.schema.json",
+  "title": "docx index",
+  "type": "object",
+  "required": ["schemaVersion", "project", "readOrder", "moduleMap"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "project": {
+      "type": "object",
+      "required": ["name", "type", "primaryLanguages", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "array", "items": { "type": "string" } },
+        "primaryLanguages": { "type": "array", "items": { "type": "string" } },
+        "summary": { "type": "string" }
+      }
+    },
+    "readOrder": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["when"],
+        "additionalProperties": false,
+        "properties": {
+          "when": { "type": "string" },
+          "files": { "type": "array", "items": { "type": "string" } },
+          "resolve": { "type": "string" }
+        }
+      }
+    },
+    "moduleMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["paths", "context"],
+        "additionalProperties": true,
+        "properties": {
+          "paths": { "type": "array", "items": { "type": "string" } },
+          "context": { "type": "string" },
+          "confidence": { "type": "string", "enum": ["candidate", "confirmed", "ignored"] }
+        }
+      }
+    }
+  }
+}

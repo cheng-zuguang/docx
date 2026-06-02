@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docx.local/schemas/v1/capabilities.schema.json",
+  "title": "docx capabilities",
+  "type": "object",
+  "required": ["schemaVersion", "availableAnalyzers", "missingRecommendedAnalyzers", "lastCheckedAt"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "availableAnalyzers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/analyzerCapability" }
+    },
+    "missingRecommendedAnalyzers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/analyzerCapability" }
+    },
+    "lastCheckedAt": { "type": "string" }
+  },
+  "$defs": {
+    "analyzerCapability": {
+      "type": "object",
+      "required": ["name", "kind", "languages", "capabilities", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "kind": { "type": "string", "enum": ["builtin", "external"] },
+        "languages": { "type": "array", "items": { "type": "string" } },
+        "capabilities": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["available", "missing"] },
+        "installHint": { "type": "string" }
+      }
+    }
+  }
+}

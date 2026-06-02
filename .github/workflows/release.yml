@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Run Go tests
+        run: go test ./...
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check npm package contents
+        run: npm pack --dry-run
+
+  release:
+    name: Build And Publish Release
+    runs-on: ubuntu-latest
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Build release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/release
+
+          build_tar() {
+            local goos="$1"
+            local goarch="$2"
+            local asset="docx_${goos}_${goarch}.tar.gz"
+            GOOS="$goos" GOARCH="$goarch" go build -o dist/docx ./cmd/docx
+            tar -C dist -czf "dist/release/${asset}" docx
+            rm -f dist/docx
+          }
+
+          build_zip() {
+            local goarch="$1"
+            local asset="docx_windows_${goarch}.zip"
+            GOOS=windows GOARCH="$goarch" go build -o dist/docx.exe ./cmd/docx
+            (cd dist && zip -q "release/${asset}" docx.exe)
+            rm -f dist/docx.exe
+          }
+
+          build_tar darwin amd64
+          build_tar darwin arm64
+          build_tar linux amd64
+          build_tar linux arm64
+          build_zip amd64
+          build_zip arm64
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/release/docx_darwin_amd64.tar.gz
+            dist/release/docx_darwin_arm64.tar.gz
+            dist/release/docx_linux_amd64.tar.gz
+            dist/release/docx_linux_arm64.tar.gz
+            dist/release/docx_windows_amd64.zip
+            dist/release/docx_windows_arm64.zip
+          generate_release_notes: true
+
+  npm:
+    name: Publish npm Package
+    runs-on: ubuntu-latest
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_NPM == 'true'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish npm package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public

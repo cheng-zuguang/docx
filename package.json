@@ -1,0 +1,26 @@
+{
+  "name": "@cheng-zuguang/docx",
+  "version": "0.1.0",
+  "description": "Go CLI for creating and maintaining AI-readable project context.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cheng-zuguang/docx.git"
+  },
+  "bin": {
+    "docx": "npm/bin/docx.js"
+  },
+  "scripts": {
+    "postinstall": "node npm/install.js"
+  },
+  "files": [
+    "npm/",
+    "install.sh",
+    "install.ps1",
+    "README.md",
+    "README.zh-CN.md"
+  ],
+  "engines": {
+    "node": ">=16"
+  }
+}

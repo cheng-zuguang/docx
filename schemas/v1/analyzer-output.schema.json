@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docx.local/schemas/v1/analyzer-output.schema.json",
+  "title": "docx analyzer output",
+  "type": "object",
+  "required": ["schemaVersion", "analyzer", "report"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "analyzer": { "$ref": "#/$defs/analyzerInfo" },
+    "report": { "$ref": "#/$defs/scanReport" }
+  },
+  "$defs": {
+    "analyzerInfo": {
+      "type": "object",
+      "required": ["name", "version", "languages", "capabilities"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "languages": { "type": "array", "items": { "type": "string" } },
+        "capabilities": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "scanReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "manifests": { "type": "array", "items": { "type": "string" } },
+        "languages": { "type": "array", "items": { "type": "string" } },
+        "frameworks": { "type": "array", "items": { "type": "string" } },
+        "entrypoints": { "type": "array", "items": { "type": "string" } },
+        "imports": { "type": "array", "items": { "type": "string" } },
+        "exports": { "type": "array", "items": { "type": "string" } },
+        "routes": { "type": "array", "items": { "type": "string" } },
+        "testFiles": { "type": "array", "items": { "type": "string" } },
+        "configFiles": { "type": "array", "items": { "type": "string" } },
+        "moduleCandidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "paths", "confidence", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "paths": { "type": "array", "items": { "type": "string" } },
+              "confidence": { "type": "string" },
+              "reason": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

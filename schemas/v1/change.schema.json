@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docx.local/schemas/v1/change.schema.json",
+  "title": "docx change",
+  "type": "object",
+  "required": ["schemaVersion", "id", "source", "modules", "files", "factsUpdated", "proposals"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "id": { "type": "string" },
+    "source": { "type": "string" },
+    "range": { "type": "string" },
+    "modules": { "type": "array", "items": { "type": "string" } },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "changeType", "signals"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string" },
+          "changeType": { "type": "string" },
+          "signals": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "factsUpdated": { "type": "array", "items": { "type": "string" } },
+    "proposals": { "type": "array", "items": { "type": "string" } },
+    "summaryAi": { "type": "string" }
+  }
+}

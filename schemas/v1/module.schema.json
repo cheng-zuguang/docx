@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docx.local/schemas/v1/module.schema.json",
+  "title": "docx module",
+  "type": "object",
+  "required": ["schemaVersion", "module", "status", "paths", "summary", "facts", "readHints", "riskRules", "recentChanges"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "module": { "type": "string" },
+    "status": { "type": "string", "enum": ["candidate", "confirmed", "ignored"] },
+    "paths": { "type": "array", "items": { "type": "string" } },
+    "summary": {
+      "type": "object",
+      "required": ["purpose", "ownedConcepts", "nonGoals"],
+      "additionalProperties": false,
+      "properties": {
+        "purpose": { "type": "string" },
+        "ownedConcepts": { "type": "array", "items": { "type": "string" } },
+        "nonGoals": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "facts": {
+      "type": "object",
+      "required": ["entrypoints", "publicApi", "dependencies", "dependents", "tests", "lastScannedAt"],
+      "additionalProperties": true,
+      "properties": {
+        "entrypoints": { "type": "array", "items": { "type": "string" } },
+        "publicApi": { "type": "array", "items": { "type": "string" } },
+        "dependencies": { "type": "array", "items": { "type": "string" } },
+        "dependents": { "type": "array", "items": { "type": "string" } },
+        "tests": { "type": "array", "items": { "type": "string" } },
+        "lastScannedAt": { "type": "string" }
+      }
+    },
+    "readHints": {
+      "type": "object",
+      "required": ["alwaysRead", "readFor"],
+      "additionalProperties": false,
+      "properties": {
+        "alwaysRead": { "type": "array", "items": { "type": "string" } },
+        "readFor": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["when", "files"],
+            "additionalProperties": false,
+            "properties": {
+              "when": { "type": "string" },
+              "files": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "riskRules": { "type": "array", "items": { "type": "string" } },
+    "recentChanges": { "type": "array", "items": { "type": "string" } }
+  }
+}

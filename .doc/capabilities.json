@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.0",
+  "availableAnalyzers": [
+    {
+      "name": "generic",
+      "kind": "builtin",
+      "languages": [
+        "*"
+      ],
+      "capabilities": [
+        "manifests",
+        "languages",
+        "frameworks",
+        "entrypoints",
+        "tests",
+        "module-candidates"
+      ],
+      "status": "available"
+    },
+    {
+      "name": "typescript",
+      "kind": "external",
+      "languages": [
+        "typescript",
+        "javascript"
+      ],
+      "capabilities": [
+        "imports",
+        "exports",
+        "frameworks",
+        "routes",
+        "tests",
+        "module-candidates"
+      ],
+      "status": "available"
+    }
+  ],
+  "missingRecommendedAnalyzers": [
+    {
+      "name": "go",
+      "kind": "external",
+      "languages": [
+        "go"
+      ],
+      "capabilities": [
+        "packages",
+        "imports",
+        "exports",
+        "tests"
+      ],
+      "status": "missing",
+      "installHint": "Configure the optional Go analyzer when it becomes available."
+    }
+  ],
+  "lastCheckedAt": ""
+}

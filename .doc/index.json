@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0",
+  "project": {
+    "name": "docx",
+    "type": [
+      "unknown"
+    ],
+    "primaryLanguages": [],
+    "summary": "Project context has been initialized but not scanned yet."
+  },
+  "readOrder": [
+    {
+      "when": "always",
+      "files": [
+        ".doc/project.json",
+        ".doc/rules/agent.md"
+      ]
+    },
+    {
+      "when": "editing module",
+      "resolve": ".doc/modules/{module}.json"
+    },
+    {
+      "when": "changing behavior",
+      "files": [
+        ".doc/decisions/index.json",
+        ".doc/changes/index.json"
+      ]
+    },
+    {
+      "when": "debugging or reviewing",
+      "files": [
+        ".doc/mistakes/index.json"
+      ]
+    }
+  ],
+  "moduleMap": {}
+}

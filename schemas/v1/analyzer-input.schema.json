@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docx.local/schemas/v1/analyzer-input.schema.json",
+  "title": "docx analyzer input",
+  "type": "object",
+  "required": ["schemaVersion", "root"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "root": { "type": "string" }
+  }
+}

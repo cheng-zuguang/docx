@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "name": "docx",
+  "types": [
+    "go-project"
+  ],
+  "summary": "Project context has been initialized but not scanned yet.",
+  "facts": {
+    "manifests": [
+      "go.mod"
+    ],
+    "lastScannedAt": ""
+  }
+}

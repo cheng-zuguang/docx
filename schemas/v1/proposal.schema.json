@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docx.local/schemas/v1/proposal.schema.json",
+  "title": "docx proposal",
+  "type": "object",
+  "required": ["schemaVersion", "id", "type", "status", "source", "evidence", "suggestedTarget", "suggestedPatch"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "id": { "type": "string" },
+    "type": { "type": "string", "enum": ["decision", "mistake", "module-summary", "risk-rule", "read-hint"] },
+    "status": { "type": "string", "enum": ["pending", "accepted", "rejected"] },
+    "source": { "type": "string" },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "suggestedTarget": { "type": "string" },
+    "suggestedPatch": { "type": "object", "additionalProperties": true }
+  }
+}

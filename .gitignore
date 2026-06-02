@@ -1,0 +1,12 @@
+.DS_Store
+.scratch/
+
+/docx
+/npm/bin-runtime/
+
+<!-- docx:start -->
+# docx local state
+.doc/.cache/
+.doc/local/
+.doc/tmp/
+<!-- docx:end -->

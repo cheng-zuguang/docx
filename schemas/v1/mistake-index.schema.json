@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docx.local/schemas/v1/mistake-index.schema.json",
+  "title": "docx mistake index",
+  "type": "object",
+  "required": ["schemaVersion", "categories", "items"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["runtime-environment", "api-contracts", "data-migration", "concurrency", "security", "testing", "project-specific"]
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "category", "path", "appliesTo"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "category": { "type": "string" },
+          "path": { "type": "string" },
+          "appliesTo": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}
