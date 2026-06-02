@@ -45,15 +45,15 @@ iwr https://raw.githubusercontent.com/cheng-zuguang/docx/main/install.ps1 -UseB 
 npm：
 
 ```bash
-npm install -g @cheng-zuguang/docx
+npm install -g @chengzg/docx
 docx --help
 ```
 
 npx：
 
 ```bash
-npx @cheng-zuguang/docx --help
-npx @cheng-zuguang/docx init
+npx @chengzg/docx --help
+npx @chengzg/docx init
 ```
 
 开发期运行：

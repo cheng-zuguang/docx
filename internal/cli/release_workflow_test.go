@@ -29,9 +29,10 @@ func TestReleaseWorkflowPublishesGitHubAssetsAndNpmPackage(t *testing.T) {
 		"docx_windows_amd64.zip",
 		"docx_windows_arm64.zip",
 		"softprops/action-gh-release",
+		"id-token: write",
+		"node-version: \"22\"",
 		"registry-url: https://registry.npmjs.org",
 		"npm publish --access public",
-		"NPM_TOKEN",
 	} {
 		if !strings.Contains(workflow, expected) {
 			t.Fatalf("release workflow should contain %q, got:\n%s", expected, workflow)

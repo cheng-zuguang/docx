@@ -12,7 +12,7 @@ const result = childProcess.spawnSync(binary, process.argv.slice(2), {
 
 if (result.error) {
   console.error(`docx binary was not found at ${binary}`);
-  console.error("Run `npm rebuild @cheng-zuguang/docx` or reinstall the package.");
+  console.error("Run `npm rebuild @chengzg/docx` or reinstall the package.");
   process.exit(1);
 }
 

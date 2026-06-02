@@ -40,8 +40,8 @@ func TestDistributionArtifactsDocumentInstallPaths(t *testing.T) {
 	if err := json.Unmarshal(packageBytes, &packageJSON); err != nil {
 		t.Fatal(err)
 	}
-	if packageJSON.Name != "@cheng-zuguang/docx" {
-		t.Fatalf("package name = %q, want @cheng-zuguang/docx", packageJSON.Name)
+	if packageJSON.Name != "@chengzg/docx" {
+		t.Fatalf("package name = %q, want @chengzg/docx", packageJSON.Name)
 	}
 	if packageJSON.Bin["docx"] != "npm/bin/docx.js" {
 		t.Fatalf("npm package should expose docx bin, got: %#v", packageJSON.Bin)
@@ -61,10 +61,10 @@ func TestDistributionArtifactsDocumentInstallPaths(t *testing.T) {
 	assertFileContains(t, root, "install.ps1", "windows")
 	assertFileContains(t, root, "npm/install.js", "DOCX_SKIP_DOWNLOAD")
 	assertFileContains(t, root, "npm/bin/docx.js", "child_process")
-	assertFileContains(t, root, "README.md", "npm install -g @cheng-zuguang/docx")
-	assertFileContains(t, root, "README.md", "npx @cheng-zuguang/docx --help")
-	assertFileContains(t, root, "README.zh-CN.md", "npm install -g @cheng-zuguang/docx")
-	assertFileContains(t, root, "README.zh-CN.md", "npx @cheng-zuguang/docx --help")
+	assertFileContains(t, root, "README.md", "npm install -g @chengzg/docx")
+	assertFileContains(t, root, "README.md", "npx @chengzg/docx --help")
+	assertFileContains(t, root, "README.zh-CN.md", "npm install -g @chengzg/docx")
+	assertFileContains(t, root, "README.zh-CN.md", "npx @chengzg/docx --help")
 }
 
 func repositoryRoot(t *testing.T) string {

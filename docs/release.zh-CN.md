@@ -36,14 +36,28 @@ docx_windows_arm64.zip
 
 ## npm 发布
 
-npm 发布由 workflow 中的 `npm` job 执行，但默认需要显式启用。
+npm 发布由 workflow 中的 `npm` job 执行，但默认需要显式启用。当前 workflow 使用 npm Trusted Publishing，不依赖长期 `NPM_TOKEN`。
 
 需要在 GitHub 仓库中配置：
 
-- Secret: `NPM_TOKEN`
 - Variable: `PUBLISH_NPM=true`
 
-`NPM_TOKEN` 应来自 npm automation token。
+还需要在 npm package 或 scope 的 Trusted Publishing 设置中绑定 GitHub Actions：
+
+```text
+Package: @chengzg/docx
+Owner / organization: cheng-zuguang
+Repository: docx
+Workflow filename: release.yml
+```
+
+如果 npm 页面要求 workflow path，填写：
+
+```text
+.github/workflows/release.yml
+```
+
+如果 npm 页面要求 environment，而 workflow 没有配置 environment，则留空。
 
 首次发布 scoped public package 时，workflow 使用：
 
