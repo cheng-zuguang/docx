@@ -1,6 +1,6 @@
 {
   "name": "@chengzg/docx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Go CLI for creating and maintaining AI-readable project context.",
   "license": "MIT",
   "repository": {
