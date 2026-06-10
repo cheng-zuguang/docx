@@ -4,10 +4,11 @@
   "types": [
     "go-project"
   ],
-  "summary": "Project context has been initialized but not scanned yet.",
+  "summary": "docx 是一个 Go CLI 工具，用于为任意代码仓库创建并维护 AI 可读的项目上下文。它在 .doc/ 目录中管理两类信息：由 CLI 刷新的「生成事实」（项目结构、模块路径、最近变更）和需要人工显式确认的「语义记忆」（设计决策、反模式、模块摘要、风险规则）。AI Agent 从 .doc/index.json 出发，按需渐进式加载上下文，避免每次会话重复扫描整个仓库。工具链包含扫描器、分析器插件协议、git hook 集成、以及面向 Codex/Claude Code 的 agent lifecycle hook，支持在提交前自动记录变更并生成语义更新提案。",
   "facts": {
     "manifests": [
-      "go.mod"
+      "go.mod",
+      "package.json"
     ],
     "lastScannedAt": ""
   }

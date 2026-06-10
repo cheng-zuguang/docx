@@ -1,5 +1,6 @@
 .DS_Store
 .scratch/
+.dist/
 
 /docx
 /npm/bin-runtime/

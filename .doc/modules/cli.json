@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.0",
+  "module": "cli",
+  "status": "confirmed",
+  "paths": [
+    "internal/cli/**"
+  ],
+  "summary": {
+    "purpose": "核心 CLI 实现层，包含所有子命令（init、scan、update、sync、finish、proposals、index、doctor、migrate、install-hook、install-agent-hook）的完整逻辑，以及上下文存储、类型定义、JSON I/O 和工具函数。",
+    "ownedConcepts": [
+      "command handlers",
+      "context store",
+      "context types",
+      "schema I/O",
+      "scanner",
+      "indexer",
+      "doctor health checks",
+      "schema migration",
+      "TypeScript analyzer"
+    ],
+    "nonGoals": [
+      "AI 推理或模型调用",
+      "git hook 脚本生成之外的 CI 流水线集成"
+    ]
+  },
+  "facts": {
+    "entrypoints": null,
+    "publicApi": [],
+    "dependencies": [],
+    "dependents": [],
+    "tests": [
+      "internal/cli/ai_update_test.go",
+      "internal/cli/analyzer_test.go",
+      "internal/cli/distribution_test.go",
+      "internal/cli/doctor_test.go",
+      "internal/cli/finish_test.go",
+      "internal/cli/help_test.go",
+      "internal/cli/hooks_test.go",
+      "internal/cli/index_test.go",
+      "internal/cli/init_test.go",
+      "internal/cli/migrate_test.go",
+      "internal/cli/proposals_test.go",
+      "internal/cli/release_workflow_test.go",
+      "internal/cli/scan_test.go",
+      "internal/cli/sync_test.go",
+      "internal/cli/update_test.go"
+    ],
+    "lastScannedAt": ""
+  },
+  "readHints": {
+    "alwaysRead": [],
+    "readFor": []
+  },
+  "riskRules": [],
+  "recentChanges": []
+}

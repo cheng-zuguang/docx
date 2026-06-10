@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0",
+  "module": "agent-proposals",
+  "status": "confirmed",
+  "paths": [
+    "internal/cli/ai_update.go",
+    "internal/cli/ai_init.go",
+    "internal/cli/proposals.go"
+  ],
+  "summary": {
+    "purpose": "负责 AI 辅助语义更新的全生命周期：为 init 和 update 命令生成任务文件（input.json + prompt.md），接收 AI Agent 写回的输出并通过 apply 子命令校验后写入上下文；管理 .doc/proposals/ 下待定/已接受/已拒绝提案的存储与审查流程，确保 decisions、mistakes、riskRules 等判断性记忆只通过显式确认才能写入。",
+    "ownedConcepts": [
+      "task file generation",
+      "proposal lifecycle (pending/accepted/rejected)",
+      "apply workflow",
+      "semantic memory gating"
+    ],
+    "nonGoals": [
+      "直接调用 AI 模型",
+      "变更事实的生成（由 change-tracking 负责）"
+    ]
+  },
+  "facts": {
+    "entrypoints": null,
+    "publicApi": [],
+    "dependencies": [],
+    "dependents": [],
+    "tests": null,
+    "lastScannedAt": ""
+  },
+  "readHints": {
+    "alwaysRead": [],
+    "readFor": []
+  },
+  "riskRules": [],
+  "recentChanges": []
+}

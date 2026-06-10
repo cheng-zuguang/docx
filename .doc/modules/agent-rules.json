@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1.0",
+  "module": "agent-rules",
+  "status": "confirmed",
+  "paths": [
+    "internal/cli/managed_blocks.go",
+    "internal/cli/hooks.go"
+  ],
+  "summary": {
+    "purpose": "通过托管块（managed blocks）机制向 AGENTS.md、CLAUDE.md、.gitignore 等文件注入或更新 docx 协议内容，同时生成 git hook 脚本（pre-commit、post-merge、post-checkout）和 agent lifecycle hook 配置（.codex/hooks.json、.claude/settings.json），确保重复执行时不重复写入且不覆盖用户自有内容。",
+    "ownedConcepts": [
+      "managed blocks",
+      "git hook installation",
+      "agent lifecycle hook (codex/claude)",
+      "AGENTS.md / CLAUDE.md injection"
+    ],
+    "nonGoals": [
+      "hook 触发后的实际命令执行逻辑（由 change-tracking / sync / finish 负责）"
+    ]
+  },
+  "facts": {
+    "entrypoints": null,
+    "publicApi": [],
+    "dependencies": [],
+    "dependents": [],
+    "tests": null,
+    "lastScannedAt": ""
+  },
+  "readHints": {
+    "alwaysRead": [],
+    "readFor": []
+  },
+  "riskRules": [],
+  "recentChanges": []
+}

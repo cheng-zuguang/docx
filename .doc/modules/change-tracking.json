@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "module": "change-tracking",
+  "status": "confirmed",
+  "paths": [
+    "internal/cli/update.go",
+    "internal/cli/gitdiff.go"
+  ],
+  "summary": {
+    "purpose": "通过解析 git diff 输出，将暂存、未暂存或历史变更映射到已确认模块，在 .doc/changes/ 下生成机器可读与人类可读的变更记录，并更新受影响模块的 recentChanges 字段。",
+    "ownedConcepts": [
+      "git diff parsing",
+      "change records (.json + .md)",
+      "module file mapping",
+      "recentChanges refresh"
+    ],
+    "nonGoals": [
+      "语义摘要生成（由 agent-proposals 负责）",
+      "index 重建（由 indexer 负责）"
+    ]
+  },
+  "facts": {
+    "entrypoints": null,
+    "publicApi": [],
+    "dependencies": [],
+    "dependents": [],
+    "tests": null,
+    "lastScannedAt": ""
+  },
+  "readHints": {
+    "alwaysRead": [],
+    "readFor": []
+  },
+  "riskRules": [],
+  "recentChanges": []
+}

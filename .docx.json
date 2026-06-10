@@ -4,14 +4,5 @@
   "contextSchemaVersion": "1.0",
   "entryFiles": [
     "AGENTS.md"
-  ],
-  "ai": {
-    "provider": "",
-    "command": "",
-    "timeoutSeconds": 120,
-    "contextSources": [
-      "docx"
-    ],
-    "output": "proposal-json"
-  }
+  ]
 }
