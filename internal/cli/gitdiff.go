@@ -28,7 +28,65 @@ func gitChangedFiles(root string, mode string, sinceRef string) ([]gitFileChange
 		}
 		return nil, err
 	}
+	changes := parseGitNameStatus(string(output))
+	if mode == "changed" {
+		staged, err := gitStagedFiles(root)
+		if err != nil {
+			return nil, err
+		}
+		untracked, err := gitUntrackedFiles(root)
+		if err != nil {
+			return nil, err
+		}
+		changes = dedupeGitFileChanges(append(append(changes, staged...), untracked...))
+	}
+	return changes, nil
+}
+
+func gitStagedFiles(root string) ([]gitFileChange, error) {
+	cmd := exec.Command("git", "diff", "--cached", "--name-status")
+	cmd.Dir = root
+	output, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return nil, fmt.Errorf("git diff --cached failed: %s", string(exitErr.Stderr))
+		}
+		return nil, err
+	}
 	return parseGitNameStatus(string(output)), nil
+}
+
+func gitUntrackedFiles(root string) ([]gitFileChange, error) {
+	cmd := exec.Command("git", "ls-files", "--others", "--exclude-standard")
+	cmd.Dir = root
+	output, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return nil, fmt.Errorf("git ls-files failed: %s", string(exitErr.Stderr))
+		}
+		return nil, err
+	}
+	var changes []gitFileChange
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		changes = append(changes, gitFileChange{Path: filepath.ToSlash(line), ChangeType: "added"})
+	}
+	return changes, nil
+}
+
+func dedupeGitFileChanges(changes []gitFileChange) []gitFileChange {
+	seen := map[string]bool{}
+	var deduped []gitFileChange
+	for _, change := range changes {
+		if seen[change.Path] {
+			continue
+		}
+		seen[change.Path] = true
+		deduped = append(deduped, change)
+	}
+	return deduped
 }
 
 func parseGitNameStatus(output string) []gitFileChange {

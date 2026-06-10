@@ -5,15 +5,6 @@ type configFile struct {
 	ContextDir           string   `json:"contextDir"`
 	ContextSchemaVersion string   `json:"contextSchemaVersion"`
 	EntryFiles           []string `json:"entryFiles"`
-	AI                   aiConfig `json:"ai"`
-}
-
-type aiConfig struct {
-	Provider       string   `json:"provider"`
-	Command        string   `json:"command"`
-	TimeoutSeconds int      `json:"timeoutSeconds"`
-	ContextSources []string `json:"contextSources"`
-	Output         string   `json:"output"`
 }
 
 type indexFile struct {

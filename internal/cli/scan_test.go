@@ -77,6 +77,55 @@ func TestScanPrintsHumanReadableReport(t *testing.T) {
 	}
 }
 
+func TestScanCreatesFallbackCoreModuleWhenNoConventionMatches(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeFixtureFile(t, dir, "src/chat/service.ts", "export const service = true\n")
+
+	var stdout, stderr bytes.Buffer
+	if err := Run([]string{"scan", "--json"}, dir, &stdout, &stderr); err != nil {
+		t.Fatalf("scan failed: %v\nstderr: %s", err, stderr.String())
+	}
+	var report scanReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("scan should emit JSON, got error %v and output:\n%s", err, stdout.String())
+	}
+	if len(report.ModuleCandidates) != 1 {
+		t.Fatalf("expected one fallback module candidate, got %#v", report.ModuleCandidates)
+	}
+	candidate := report.ModuleCandidates[0]
+	if candidate.Name != "core" {
+		t.Fatalf("candidate name = %q, want core", candidate.Name)
+	}
+	assertContains(t, candidate.Paths, "src/**")
+	if candidate.Confidence != "low" {
+		t.Fatalf("expected low confidence for fallback candidate, got %#v", candidate)
+	}
+}
+
+func TestScanSuggestsWorkflowModulesForGoCLI(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeFixtureFile(t, dir, "go.mod", "module example.com/app\n")
+	writeFixtureFile(t, dir, "internal/cli/update.go", "package cli\n")
+	writeFixtureFile(t, dir, "internal/cli/ai_update.go", "package cli\n")
+	writeFixtureFile(t, dir, "internal/cli/managed_blocks.go", "package cli\n")
+
+	report, err := scanProject(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, candidate := range report.ModuleCandidates {
+		names = append(names, candidate.Name)
+	}
+	assertContains(t, names, "change-tracking")
+	assertContains(t, names, "agent-rules")
+	assertContains(t, names, "agent-proposals")
+}
+
 func writeFixtureFile(t *testing.T, root string, path string, content string) {
 	t.Helper()
 	abs := filepath.Join(root, path)

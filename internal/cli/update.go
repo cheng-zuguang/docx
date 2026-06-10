@@ -33,18 +33,11 @@ func runUpdate(args []string, cwd string, stdout io.Writer) error {
 	mode := ""
 	sinceRef := ""
 	selectedModule := ""
-	aiMode := false
-	aiCommand := ""
+	proposeMode := false
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
-		case "--ai":
-			aiMode = true
-		case "--ai-command":
-			if i+1 >= len(args) {
-				return errors.New("docx update: --ai-command requires a command")
-			}
-			i++
-			aiCommand = args[i]
+		case "--propose":
+			proposeMode = true
 		case "--changed":
 			mode = "changed"
 		case "--staged":
@@ -70,9 +63,6 @@ func runUpdate(args []string, cwd string, stdout io.Writer) error {
 	if mode == "" {
 		return errors.New("docx update: specify --changed, --staged, --since <ref>, or --module <name>")
 	}
-	if aiCommand != "" && !aiMode {
-		return errors.New("docx update: --ai-command requires --ai")
-	}
 
 	root, err := filepath.Abs(cwd)
 	if err != nil {
@@ -84,9 +74,6 @@ func runUpdate(args []string, cwd string, stdout io.Writer) error {
 	}
 	if err := requireCompatibleSchema(config); err != nil {
 		return err
-	}
-	if aiMode && aiCommand == "" {
-		aiCommand = configuredAICommand(config)
 	}
 	indexPath := filepath.Join(root, config.ContextDir, "index.json")
 	index, err := readIndex(indexPath)
@@ -146,12 +133,8 @@ func runUpdate(args []string, cwd string, stdout io.Writer) error {
 		FactsUpdated:  factsUpdated,
 		Proposals:     []string{},
 	}
-	if aiMode {
-		proposals, err := writeAIUpdateProposals(root, config.ContextDir, index, modules, files, changeID, record.Source, aiCommand)
-		if err != nil {
-			return err
-		}
-		record.Proposals = proposals
+	if proposeMode {
+		record.Proposals = []string{}
 	}
 	if mode == "since" {
 		record.Range = sinceRef + "..HEAD"
@@ -165,14 +148,14 @@ func runUpdate(args []string, cwd string, stdout io.Writer) error {
 		return err
 	}
 	for _, module := range modules {
-		if !aiMode {
+		if !proposeMode {
 			if err := appendModuleRecentChange(filepath.Join(root, config.ContextDir, "modules", module+".json"), changeRel); err != nil {
 				return err
 			}
 		}
 	}
-	if aiMode {
-		if err := rebuildProposalsIndex(root, config.ContextDir); err != nil {
+	if proposeMode {
+		if err := writeProposalTask(root, config.ContextDir, index, modules, files, changeID, record.Source, stdout); err != nil {
 			return err
 		}
 	}
@@ -228,6 +211,10 @@ func newChangeID() string {
 func writeChangeMarkdown(path string, record changeRecord) error {
 	var builder strings.Builder
 	builder.WriteString("# Change " + record.ID + "\n\n")
+	builder.WriteString("## Summary\n\n")
+	builder.WriteString(changeSummary(record) + "\n\n")
+	builder.WriteString("## Why This Matters\n\n")
+	builder.WriteString("This record feeds audit trails, module `recentChanges`, proposal evidence, and future AI context.\n\n")
 	builder.WriteString("## Source\n\n")
 	builder.WriteString(record.Source + "\n\n")
 	builder.WriteString("## Modules Affected\n\n")
@@ -239,6 +226,43 @@ func writeChangeMarkdown(path string, record changeRecord) error {
 		builder.WriteString("- " + file.ChangeType + ": `" + file.Path + "`\n")
 	}
 	return os.WriteFile(path, []byte(builder.String()), 0o644)
+}
+
+func changeSummary(record changeRecord) string {
+	if len(record.Files) == 0 {
+		return fmt.Sprintf("Context refresh for %s.", inlineList(record.Modules))
+	}
+	counts := map[string]int{}
+	for _, file := range record.Files {
+		counts[file.ChangeType]++
+	}
+	var parts []string
+	for _, changeType := range []string{"added", "modified", "deleted", "renamed"} {
+		count := counts[changeType]
+		if count == 0 {
+			continue
+		}
+		noun := "source file"
+		if count != 1 {
+			noun = "source files"
+		}
+		parts = append(parts, fmt.Sprintf("%d %s %s", count, changeType, noun))
+	}
+	if len(parts) == 0 {
+		parts = append(parts, fmt.Sprintf("%d changed source files", len(record.Files)))
+	}
+	return strings.Join(parts, ", ") + " in " + inlineList(record.Modules) + "."
+}
+
+func inlineList(values []string) string {
+	if len(values) == 0 {
+		return "`unknown`"
+	}
+	quoted := make([]string, 0, len(values))
+	for _, value := range values {
+		quoted = append(quoted, "`"+value+"`")
+	}
+	return strings.Join(quoted, ", ")
 }
 
 func appendModuleRecentChange(path string, changeRel string) error {

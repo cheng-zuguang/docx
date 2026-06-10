@@ -84,8 +84,25 @@ func agentBlock(contextDir string) string {
 		"## Project Context\n\n" +
 		"Before work, read `" + contextDir + "/index.json`.\n\n" +
 		"Follow its `readOrder` progressively. Resolve edited paths with `moduleMap`; inspect decisions and recent changes for behavior changes; inspect mistakes while debugging or reviewing.\n\n" +
+		"Keep `AGENTS.md` short; use `" + contextDir + "/rules/agent.md` for detailed behavior.\n\n" +
+		"When an agent lifecycle hook is installed, let it run `docx finish`; otherwise run `docx sync` before finishing.\n\n" +
+		"Use change records for audit trails, module `recentChanges`, proposal evidence, and future AI context.\n\n" +
 		"Do not overwrite semantic memory in `" + contextDir + "/decisions/`, `" + contextDir + "/mistakes/`, or module `riskRules` without user confirmation. Write proposals instead.\n" +
 		"<!-- docx:end -->\n"
+}
+
+func agentRulesText(contextDir string) string {
+	return "# Agent Reading Protocol\n\n" +
+		"Read `" + contextDir + "/index.json` first and follow `readOrder` progressively.\n\n" +
+		"Read affected module files resolved from `moduleMap` before editing or summarizing module behavior.\n\n" +
+		"When an agent lifecycle hook is installed, let it run `docx finish`; otherwise run `docx sync` before finishing.\n\n" +
+		"`docx finish` is a safe lifecycle-hook wrapper around `docx sync`.\n\n" +
+		"`docx sync` records changed files, updates deterministic module context, and writes an active-agent task under `" + contextDir + "/tmp/` when semantic follow-up is needed.\n\n" +
+		"Deterministic facts may be refreshed directly; semantic memory requires proposals unless the user confirms the edit.\n\n" +
+		"Use change records for audit trails, module `recentChanges`, proposal evidence, and future AI context.\n\n" +
+		"Prefer finer modules around real workflows when a coarse module hides unrelated concepts.\n\n" +
+		"When active-agent task files already exist under `" + contextDir + "/tmp/`, read the prompt, produce the requested JSON, then run the matching `docx apply ...` command.\n\n" +
+		"Do not overwrite semantic memory in `" + contextDir + "/decisions/`, `" + contextDir + "/mistakes/`, or module `riskRules` without user confirmation. Write proposals instead.\n"
 }
 
 func gitignoreBlock(contextDir string) string {

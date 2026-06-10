@@ -45,17 +45,9 @@ func TestInitCreatesContextAndPreservesAgentFile(t *testing.T) {
 	if !strings.Contains(config, `"contextDir": ".doc"`) {
 		t.Fatalf("config should record default context dir, got:\n%s", config)
 	}
-	for _, expected := range []string{
-		`"ai": {`,
-		`"provider": ""`,
-		`"command": ""`,
-		`"timeoutSeconds": 120`,
-		`"contextSources": [`,
-		`"docx"`,
-		`"output": "proposal-json"`,
-	} {
-		if !strings.Contains(config, expected) {
-			t.Fatalf("config should include default AI field %s, got:\n%s", expected, config)
+	for _, unexpected := range []string{`"ai": {`, `"command"`, `"provider"`, `"output"`} {
+		if strings.Contains(config, unexpected) {
+			t.Fatalf("config should not include legacy AI command field %s, got:\n%s", unexpected, config)
 		}
 	}
 
@@ -69,6 +61,42 @@ func TestInitCreatesContextAndPreservesAgentFile(t *testing.T) {
 	}
 	if !strings.Contains(agents, "<!-- docx:start -->") || !strings.Contains(agents, "<!-- docx:end -->") {
 		t.Fatalf("init should insert managed docx block, got:\n%s", agents)
+	}
+	for _, expected := range []string{
+		"When an agent lifecycle hook is installed, let it run `docx finish`; otherwise run `docx sync` before finishing.",
+		"Keep `AGENTS.md` short; use `.doc/rules/agent.md` for detailed behavior.",
+		"Use change records for audit trails, module `recentChanges`, proposal evidence, and future AI context.",
+	} {
+		if !strings.Contains(agents, expected) {
+			t.Fatalf("managed AGENTS.md block should include update protocol %q, got:\n%s", expected, agents)
+		}
+	}
+	agentRulesBytes, err := os.ReadFile(filepath.Join(dir, ".doc", "rules", "agent.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	agentRules := string(agentRulesBytes)
+	for _, expected := range []string{
+		"When an agent lifecycle hook is installed, let it run `docx finish`; otherwise run `docx sync` before finishing.",
+		"`docx finish` is a safe lifecycle-hook wrapper around `docx sync`.",
+		"Read affected module files resolved from `moduleMap` before editing or summarizing module behavior.",
+		"`docx sync` records changed files, updates deterministic module context, and writes an active-agent task",
+		"Deterministic facts may be refreshed directly; semantic memory requires proposals unless the user confirms the edit.",
+		"Use change records for audit trails, module `recentChanges`, proposal evidence, and future AI context.",
+		"Prefer finer modules around real workflows when a coarse module hides unrelated concepts.",
+	} {
+		if !strings.Contains(agentRules, expected) {
+			t.Fatalf("agent rules should include %q, got:\n%s", expected, agentRules)
+		}
+	}
+	if strings.Contains(agentRules, "DOCX_AI_UPDATE_CMD") || strings.Contains(agentRules, "update --ai") {
+		t.Fatalf("agent rules should not make configured AI scripts the default path, got:\n%s", agentRules)
+	}
+	if strings.Contains(agentRules, "rebuilds indexes") {
+		t.Fatalf("agent rules should not claim docx sync rebuilds indexes, got:\n%s", agentRules)
+	}
+	if !strings.Contains(agentRules, "When an agent lifecycle hook is installed, let it run `docx finish`; otherwise run `docx sync` before finishing.") {
+		t.Fatalf("agent rules should include update protocol, got:\n%s", agentRules)
 	}
 
 	before := agents
@@ -293,6 +321,213 @@ func TestInitCanAcceptDetectedModuleCandidates(t *testing.T) {
 	}
 	if module.Status != "confirmed" {
 		t.Fatalf("module status = %q, want confirmed", module.Status)
+	}
+}
+
+func TestInitAcceptCandidatesProposalTaskCreatesAgentProposalTask(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeFixtureFile(t, dir, "src/features/billing/index.ts", "export const billing = true\n")
+
+	var stdout, stderr bytes.Buffer
+	if err := Run([]string{"init", "--accept-candidates", "--summarize"}, dir, &stdout, &stderr); err != nil {
+		t.Fatalf("init --summarize failed: %v\nstdout:%s\nstderr:%s", err, stdout.String(), stderr.String())
+	}
+	for _, path := range []string{
+		".doc/tmp/init-summary-input.json",
+		".doc/tmp/init-summary-prompt.md",
+	} {
+		if _, err := os.Stat(filepath.Join(dir, path)); err != nil {
+			t.Fatalf("expected proposal task file %s: %v", path, err)
+		}
+	}
+	if !strings.Contains(stdout.String(), "Agent init summary task") {
+		t.Fatalf("init should explain the proposal task, got:\n%s", stdout.String())
+	}
+	inputBytes, err := os.ReadFile(filepath.Join(dir, ".doc", "tmp", "init-summary-input.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var input struct {
+		SchemaVersion string `json:"schemaVersion"`
+		Modules       []struct {
+			Name string `json:"name"`
+		} `json:"modules"`
+	}
+	if err := json.Unmarshal(inputBytes, &input); err != nil {
+		t.Fatal(err)
+	}
+	if input.SchemaVersion != schemaVersion || len(input.Modules) != 1 || input.Modules[0].Name != "billing" {
+		t.Fatalf("unexpected proposal task input:\n%s", string(inputBytes))
+	}
+}
+
+func TestInitRejectsRemovedAIAndAutoOptions(t *testing.T) {
+	t.Parallel()
+
+	for _, option := range []string{"--ai", "--auto", "--handoff"} {
+		option := option
+		t.Run(option, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			var stdout, stderr bytes.Buffer
+			err := Run([]string{"init", option}, dir, &stdout, &stderr)
+			if err == nil {
+				t.Fatalf("init %s should fail after the option was removed", option)
+			}
+			if !strings.Contains(err.Error(), `unknown option "`+option+`"`) {
+				t.Fatalf("init %s should report an unknown option, got %v", option, err)
+			}
+		})
+	}
+}
+
+func TestInitAIIgnoresConfiguredAICommandAndCreatesProposalTask(t *testing.T) {
+	dir := t.TempDir()
+	writeFixtureFile(t, dir, "src/features/billing/index.ts", "export const billing = true\n")
+	script := filepath.Join(dir, "mock-init-summary.sh")
+	writeFixtureFile(t, dir, "mock-init-summary.sh", "#!/bin/sh\ncat >/dev/null\ncat <<'EOF'\n{\"schemaVersion\":\"1.0\",\"project\":{\"summary\":\"auto init summary\"},\"modules\":[{\"name\":\"billing\",\"summary\":{\"purpose\":\"Auto billing summary.\",\"ownedConcepts\":[\"billing\"],\"nonGoals\":[]}}]}\nEOF\n")
+	if err := os.Chmod(script, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DOCX_AI_INIT_CMD", script)
+
+	var stdout, stderr bytes.Buffer
+	if err := Run([]string{"init", "--accept-candidates", "--summarize"}, dir, &stdout, &stderr); err != nil {
+		t.Fatalf("init --summarize failed: %v\nstdout:%s\nstderr:%s", err, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Agent init summary task") {
+		t.Fatalf("expected proposal task output, got:\n%s", stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".doc", "tmp", "init-summary-prompt.md")); err != nil {
+		t.Fatalf("agent proposal task should create prompt even when AI command is configured: %v", err)
+	}
+	projectBytes, err := os.ReadFile(filepath.Join(dir, ".doc", "project.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(projectBytes), "auto init summary") {
+		t.Fatalf("configured AI command should not be executed or auto-applied, got:\n%s", string(projectBytes))
+	}
+}
+
+func TestAIInitApplyWritesSummariesFromFile(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeFixtureFile(t, dir, "src/features/billing/index.ts", "export const billing = true\n")
+	var stdout, stderr bytes.Buffer
+	if err := Run([]string{"init", "--accept-candidates", "--summarize"}, dir, &stdout, &stderr); err != nil {
+		t.Fatalf("init --summarize failed: %v\nstdout:%s\nstderr:%s", err, stdout.String(), stderr.String())
+	}
+	outputPath := filepath.Join(dir, ".doc", "tmp", "init-summary-output.json")
+	writeFixtureFile(t, dir, ".doc/tmp/init-summary-output.json", `{
+  "schemaVersion": "1.0",
+  "project": {
+    "summary": "A billing-focused TypeScript project."
+  },
+  "modules": [
+    {
+      "name": "billing",
+      "summary": {
+        "purpose": "Owns billing feature entrypoints.",
+        "ownedConcepts": ["billing"],
+        "nonGoals": []
+      },
+      "riskRules": ["must not be written during init"]
+    }
+  ]
+}`)
+
+	stdout.Reset()
+	stderr.Reset()
+	if err := Run([]string{"apply", "init", outputPath}, dir, &stdout, &stderr); err != nil {
+		t.Fatalf("apply init failed: %v\nstdout:%s\nstderr:%s", err, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Applied init summaries: project=updated modules=1") {
+		t.Fatalf("apply should report updated summaries, got:\n%s", stdout.String())
+	}
+
+	projectBytes, err := os.ReadFile(filepath.Join(dir, ".doc", "project.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var project struct {
+		Summary string `json:"summary"`
+	}
+	if err := json.Unmarshal(projectBytes, &project); err != nil {
+		t.Fatal(err)
+	}
+	if project.Summary != "A billing-focused TypeScript project." {
+		t.Fatalf("project summary = %q", project.Summary)
+	}
+
+	moduleBytes, err := os.ReadFile(filepath.Join(dir, ".doc", "modules", "billing.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var module struct {
+		Summary   moduleSummary `json:"summary"`
+		RiskRules []string      `json:"riskRules"`
+	}
+	if err := json.Unmarshal(moduleBytes, &module); err != nil {
+		t.Fatal(err)
+	}
+	if module.Summary.Purpose != "Owns billing feature entrypoints." {
+		t.Fatalf("module summary was not written, got:\n%s", string(moduleBytes))
+	}
+	assertContains(t, module.Summary.OwnedConcepts, "billing")
+	if len(module.RiskRules) != 0 {
+		t.Fatalf("apply init should not write riskRules, got: %#v", module.RiskRules)
+	}
+}
+
+func TestAIInitApplyCanReadStdin(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeFixtureFile(t, dir, "src/features/billing/index.ts", "export const billing = true\n")
+	var stdout, stderr bytes.Buffer
+	if err := Run([]string{"init", "--accept-candidates"}, dir, &stdout, &stderr); err != nil {
+		t.Fatalf("init failed: %v\nstderr:%s", err, stderr.String())
+	}
+
+	stdin := strings.NewReader(`{
+  "schemaVersion": "1.0",
+  "project": {
+    "summary": "stdin project summary"
+  },
+  "modules": [
+    {
+      "name": "billing",
+      "summary": {
+        "purpose": "Owns stdin billing summary.",
+        "ownedConcepts": ["billing"],
+        "nonGoals": []
+      }
+    }
+  ]
+}`)
+
+	stdout.Reset()
+	stderr.Reset()
+	if err := RunWithInput([]string{"apply", "init", "--stdin"}, dir, stdin, &stdout, &stderr); err != nil {
+		t.Fatalf("apply init --stdin failed: %v\nstdout:%s\nstderr:%s", err, stdout.String(), stderr.String())
+	}
+	moduleBytes, err := os.ReadFile(filepath.Join(dir, ".doc", "modules", "billing.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var module struct {
+		Summary moduleSummary `json:"summary"`
+	}
+	if err := json.Unmarshal(moduleBytes, &module); err != nil {
+		t.Fatal(err)
+	}
+	if module.Summary.Purpose != "Owns stdin billing summary." {
+		t.Fatalf("module summary was not decoded from stdin, got:\n%s", string(moduleBytes))
 	}
 }
 

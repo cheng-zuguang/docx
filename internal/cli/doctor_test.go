@@ -75,15 +75,61 @@ func TestDoctorStrictFailsWhenRequiredFilesAreMissing(t *testing.T) {
 	}
 }
 
+func TestDoctorTreatsInstalledAgentHookAsOptionalHook(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	if err := Run([]string{"init"}, dir, &stdout, &stderr); err != nil {
+		t.Fatalf("init failed: %v\nstderr: %s", err, stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if err := Run([]string{"install-agent-hook", "codex"}, dir, &stdout, &stderr); err != nil {
+		t.Fatalf("install-agent-hook failed: %v\nstderr: %s", err, stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if err := Run([]string{"doctor", "--json"}, dir, &stdout, &stderr); err != nil {
+		t.Fatalf("doctor failed: %v\nstderr: %s", err, stderr.String())
+	}
+
+	var report doctorReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("doctor should emit JSON, got %v:\n%s", err, stdout.String())
+	}
+	hooks := reportCheck(report, "hooks")
+	if hooks.Status != "ok" {
+		t.Fatalf("agent lifecycle hook should satisfy optional hooks check, got %#v", hooks)
+	}
+	if !containsString(hooks.Details, ".codex/hooks.json") {
+		t.Fatalf("hooks check should report the installed agent hook, got %#v", hooks)
+	}
+}
+
 func removePath(root string, path string) error {
 	return os.Remove(filepath.Join(root, path))
 }
 
 func reportStatus(report doctorReport, name string) string {
+	return reportCheck(report, name).Status
+}
+
+func reportCheck(report doctorReport, name string) doctorCheck {
 	for _, check := range report.Checks {
 		if check.Name == name {
-			return check.Status
+			return check
 		}
 	}
-	return ""
+	return doctorCheck{}
+}
+
+func containsString(values []string, expected string) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+	return false
 }

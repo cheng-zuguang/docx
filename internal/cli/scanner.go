@@ -194,6 +194,7 @@ func scanProject(cwd string) (scanReport, error) {
 	moduleCandidates := map[string]moduleCandidate{}
 	seenLanguages := map[string]bool{}
 	seenFrameworks := map[string]bool{}
+	sourceRoots := map[string]bool{}
 
 	err = filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -233,6 +234,9 @@ func scanProject(cwd string) (scanReport, error) {
 
 		for _, language := range languagesForFile(name) {
 			seenLanguages[language] = true
+			if root := sourceRootForPath(rel); root != "" {
+				sourceRoots[root] = true
+			}
 		}
 		if name == "package.json" {
 			content, err := os.ReadFile(path)
@@ -245,6 +249,9 @@ func scanProject(cwd string) (scanReport, error) {
 		if candidate, ok := moduleCandidateForPath(rel); ok {
 			moduleCandidates[candidate.Name] = candidate
 		}
+		if candidate, ok := workflowModuleCandidateForPath(rel); ok {
+			moduleCandidates[candidate.Name] = candidate
+		}
 		return nil
 	})
 	if err != nil {
@@ -253,6 +260,11 @@ func scanProject(cwd string) (scanReport, error) {
 
 	report.Languages = sortedKeys(seenLanguages)
 	report.Frameworks = sortedKeys(seenFrameworks)
+	if len(moduleCandidates) == 0 {
+		if fallback, ok := fallbackModuleCandidate(sourceRoots); ok {
+			moduleCandidates[fallback.Name] = fallback
+		}
+	}
 	report.ModuleCandidates = sortedCandidates(moduleCandidates)
 	sortScanReport(&report)
 	return report, nil
@@ -324,7 +336,7 @@ func isEntrypoint(rel string) bool {
 func moduleCandidateForPath(rel string) (moduleCandidate, bool) {
 	parts := strings.Split(rel, "/")
 	for i := 0; i+2 < len(parts); i++ {
-		if (parts[i] == "modules" || parts[i] == "features") && parts[i+1] != "" {
+		if isModuleContainer(parts[i]) && parts[i+1] != "" {
 			name := parts[i+1]
 			prefix := strings.Join(parts[:i+2], "/")
 			return moduleCandidate{
@@ -343,7 +355,83 @@ func moduleCandidateForPath(rel string) (moduleCandidate, bool) {
 			Reason:     "directory follows packages/* workspace convention",
 		}, true
 	}
+	if len(parts) >= 2 && (parts[0] == "internal" || parts[0] == "cmd") && parts[1] != "" {
+		name := parts[1]
+		return moduleCandidate{
+			Name:       name,
+			Paths:      []string{parts[0] + "/" + name + "/**"},
+			Confidence: "medium",
+			Reason:     "directory follows " + parts[0] + "/* package convention",
+		}, true
+	}
 	return moduleCandidate{}, false
+}
+
+func isModuleContainer(name string) bool {
+	switch name {
+	case "modules", "features", "apps", "services", "domains":
+		return true
+	default:
+		return false
+	}
+}
+
+func workflowModuleCandidateForPath(rel string) (moduleCandidate, bool) {
+	switch rel {
+	case "internal/cli/update.go", "internal/cli/gitdiff.go":
+		return moduleCandidate{
+			Name:       "change-tracking",
+			Paths:      []string{"internal/cli/update.go", "internal/cli/gitdiff.go"},
+			Confidence: "medium",
+			Reason:     "files own the change tracking workflow",
+		}, true
+	case "internal/cli/managed_blocks.go", "internal/cli/hooks.go":
+		return moduleCandidate{
+			Name:       "agent-rules",
+			Paths:      []string{"internal/cli/managed_blocks.go", "internal/cli/hooks.go"},
+			Confidence: "medium",
+			Reason:     "files own generated agent instructions and hooks",
+		}, true
+	case "internal/cli/ai_update.go", "internal/cli/ai_init.go", "internal/cli/proposals.go":
+		return moduleCandidate{
+			Name:       "agent-proposals",
+			Paths:      []string{"internal/cli/ai_update.go", "internal/cli/ai_init.go", "internal/cli/proposals.go"},
+			Confidence: "medium",
+			Reason:     "files own active-agent tasks and semantic proposals",
+		}, true
+	default:
+		return moduleCandidate{}, false
+	}
+}
+
+func sourceRootForPath(rel string) string {
+	parts := strings.Split(rel, "/")
+	if len(parts) < 2 {
+		return ""
+	}
+	switch parts[0] {
+	case "src", "app", "lib", "internal", "cmd", "services", "apps", "pkg":
+		return parts[0]
+	default:
+		return ""
+	}
+}
+
+func fallbackModuleCandidate(sourceRoots map[string]bool) (moduleCandidate, bool) {
+	if len(sourceRoots) == 0 {
+		return moduleCandidate{}, false
+	}
+	paths := make([]string, 0, len(sourceRoots))
+	for root := range sourceRoots {
+		paths = append(paths, root+"/**")
+	}
+	sort.Strings(paths)
+	return moduleCandidate{
+		Name:       "core",
+		Paths:      paths,
+		Confidence: "low",
+		Reason:     "fallback candidate inferred from source directories",
+	}, true
 }
 
 func sortedKeys(values map[string]bool) []string {

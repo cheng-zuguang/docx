@@ -11,6 +11,7 @@
     "docx": "npm/bin/docx.js"
   },
   "scripts": {
+    "install:local": "sh scripts/install-local.sh",
     "postinstall": "node npm/install.js"
   },
   "files": [

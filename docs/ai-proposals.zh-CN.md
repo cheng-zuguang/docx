@@ -1,76 +1,58 @@
-# AI Proposals
+# Agent Proposals
 
-本文档说明 `docx update --ai`、本地 AI 命令适配，以及 `.docx.json` 中的 AI 配置。
+本文档说明 `docx update --propose`、active-agent task，以及语义 proposal 的输入/输出协议。
 
 ## 语义更新原则
 
-`docx update --ai` 是 provider-agnostic 的语义 proposal 生成入口。它不会直接修改：
+`docx update --propose` 是语义 proposal 的 task 入口。它不会直接修改：
 
 - `.doc/decisions/`
 - `.doc/mistakes/`
 - module `summary`
 - module `riskRules`
+- `.doc/index.json` 的 confirmed `moduleMap`
 
-AI 只能生成 pending proposal。用户需要通过以下命令显式确认后，语义记忆才会落盘：
+`docx` 不主动调用 AI 命令。当前 agent 读取 `.doc/tmp/*-prompt.md` 和 `.doc/tmp/*-input.json`，生成 JSON 输出，再由 `docx apply proposals` 写入 pending proposal。用户需要通过以下命令显式确认后，语义记忆才会落盘：
 
 ```bash
 docx proposals accept <id>
 ```
 
-## 默认 AI Proposal
-
-不提供本地 AI 命令时：
+## Proposal Task
 
 ```bash
-docx update --staged --ai
+docx update --staged --propose
+docx update --changed --propose
+docx update --since HEAD~1 --propose
 ```
 
 当前行为：
 
-- 仍然记录 change JSON/Markdown。
-- 为受影响模块生成 pending proposal。
-- proposal source 为 `ai:provider-agnostic`。
-- 不直接修改语义记忆。
+- 记录 change JSON/Markdown。
+- 创建 `.doc/tmp/proposals-input.json`。
+- 创建 `.doc/tmp/proposals-prompt.md`。
+- 不直接写 proposal，不直接修改语义记忆。
 
-## 本地 AI 命令
-
-用户可以让 `docx` 调用本地已有 AI 工具生成 proposal：
+当前 agent 完成 proposal JSON 后应用：
 
 ```bash
-docx update --staged --ai --ai-command "./scripts/docx-local-ai.sh"
-docx update --changed --ai --ai-command "ollama run qwen2.5-coder"
-docx update --since HEAD~1 --ai --ai-command "claude -p"
+docx apply proposals .doc/tmp/proposals-output.json
 ```
 
-本地命令通过 stdin 接收稳定 JSON，通过 stdout 返回单个 proposal 或 proposal 数组。
+也可以从 stdin 应用：
 
-## `.docx.json` 配置
-
-也可以把本地 AI 命令写入 `.docx.json`，之后直接运行 `docx update --ai`：
-
-```json
-{
-  "ai": {
-    "provider": "local-command",
-    "command": "codex exec --json",
-    "timeoutSeconds": 120,
-    "contextSources": ["docx", "codegraph"],
-    "output": "proposal-json"
-  }
-}
+```bash
+docx apply proposals --stdin < .doc/tmp/proposals-output.json
 ```
-
-优先级：命令行 `--ai-command` 高于 `.docx.json.ai.command`。
-
-只有 `ai.provider=local-command` 且 `ai.output` 为空或 `proposal-json` 时，CLI 才会使用配置里的本地命令。
 
 ## 输入协议示例
 
-`docx` 会通过 stdin 向本地命令写入：
+`docx` 会把稳定 JSON 写入 `.doc/tmp/proposals-input.json`：
 
 ```json
 {
   "schemaVersion": "1.0",
+  "changeId": "20260101T000000.000000000Z",
   "source": "git:staged",
   "modules": [
     {
@@ -102,39 +84,66 @@ docx update --since HEAD~1 --ai --ai-command "claude -p"
 
 ## 输出协议示例
 
-本地命令 stdout 可以返回单个 proposal：
+当前 agent 可以返回一个 proposal：
 
 ```json
 {
   "schemaVersion": "1.0",
-  "id": "local-ai-chat-summary",
-  "type": "module-summary",
-  "status": "pending",
-  "source": "ai:local-command",
-  "evidence": [
-    {
-      "path": "src/modules/chat/index.ts",
-      "reason": "Local AI reviewed the changed chat module."
+  "changeId": "20260101T000000.000000000Z",
+  "proposals": {
+    "schemaVersion": "1.0",
+    "id": "active-agent-chat-summary",
+    "type": "module-summary",
+    "status": "pending",
+    "source": "ai:active-agent",
+    "evidence": [
+      {
+        "path": "src/modules/chat/index.ts",
+        "reason": "Active agent reviewed the changed chat module."
+      }
+    ],
+    "suggestedTarget": ".doc/modules/chat.json",
+    "suggestedPatch": {
+      "purpose": "Owns chat conversations."
     }
-  ],
-  "suggestedTarget": ".doc/modules/chat.json",
-  "suggestedPatch": {
-    "purpose": "Owns chat conversations."
   }
 }
 ```
 
 也可以返回 proposal 数组。
 
-`docx` 只会写入 schema-valid、`status=pending` 的 proposals；命令失败、输出非 JSON 或 proposal 缺失必要字段时，会返回错误，并且不写入语义记忆。
+`docx` 只会写入 schema-valid、`status=pending`、带 evidence 的 proposals；输出非 JSON 或 proposal 缺失必要字段时，会返回错误，并且不写入语义记忆。
 
-## 本地工具包装脚本
+## 模块分区 Proposal
 
-Codex、Claude、Ollama、Aider 或其他本地命令都可以通过包装脚本接入。包装脚本的职责是：
+当 scanner 发现的模块粒度太粗时，当前 agent 应生成 `module-partition` proposal，而不是直接改 `.doc/index.json`：
 
-- 从 stdin 读取 `docx` 输入 JSON。
-- 调用本地 AI 工具或 MCP/code graph 工具。
-- 将模型输出整理成 `proposal.schema.json` 兼容 JSON。
-- 只向 stdout 输出 proposal JSON，不混入解释性文本。
+```json
+{
+  "schemaVersion": "1.0",
+  "id": "partition-cli-context",
+  "type": "module-partition",
+  "status": "pending",
+  "source": "ai:active-agent",
+  "evidence": [
+    {
+      "path": "internal/cli/sync.go",
+      "reason": "Context synchronization is a separate workflow from command dispatch."
+    }
+  ],
+  "suggestedTarget": ".doc/index.json",
+  "suggestedPatch": {
+    "modules": [
+      {
+        "name": "context-sync",
+        "paths": ["internal/cli/sync.go", "internal/cli/update.go"],
+        "purpose": "Owns change records and active-agent context synchronization.",
+        "ownedConcepts": ["change record", "recentChanges", "agent sync task"],
+        "nonGoals": ["command dispatch"]
+      }
+    ]
+  }
+}
+```
 
-CLI 核心不强制绑定任何 LLM provider。
+接受该 proposal 后，`docx` 会更新 `.doc/index.json` 的 `moduleMap`，并写入对应 `.doc/modules/<module>.json`。

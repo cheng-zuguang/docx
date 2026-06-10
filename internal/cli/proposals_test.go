@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -304,6 +305,89 @@ func TestProposalsAcceptUpdatesModuleSummaryAndRiskRules(t *testing.T) {
 	} {
 		if !strings.Contains(module, expected) {
 			t.Fatalf("module file should contain %q, got:\n%s", expected, module)
+		}
+	}
+}
+
+func TestProposalsAcceptAppliesAgentModulePartition(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeFixtureFile(t, dir, "src/app/chat/index.ts", "export const chat = 1\n")
+	writeFixtureFile(t, dir, "src/app/billing/index.ts", "export const billing = 1\n")
+	var stdout, stderr bytes.Buffer
+	if err := Run([]string{"init"}, dir, &stdout, &stderr); err != nil {
+		t.Fatalf("init failed: %v\nstderr: %s", err, stderr.String())
+	}
+	writeFixtureFile(t, dir, ".doc/proposals/prop-partition.json", `{
+  "schemaVersion": "1.0",
+  "id": "prop-partition",
+  "type": "module-partition",
+  "status": "pending",
+  "source": "ai:active-agent",
+  "evidence": [
+    {"path": "src/app/chat/index.ts", "reason": "Chat and billing own separate workflows."},
+    {"path": "src/app/billing/index.ts", "reason": "Billing has independent concepts and tests."}
+  ],
+  "suggestedTarget": ".doc/index.json",
+  "suggestedPatch": {
+    "modules": [
+      {
+        "name": "chat-workflow",
+        "paths": ["src/app/chat/**"],
+        "purpose": "Owns chat user workflows.",
+        "ownedConcepts": ["conversation"],
+        "nonGoals": ["billing"]
+      },
+      {
+        "name": "billing-workflow",
+        "paths": ["src/app/billing/**"],
+        "purpose": "Owns billing user workflows.",
+        "ownedConcepts": ["invoice"],
+        "nonGoals": ["conversation"]
+      }
+    ]
+  }
+}`)
+
+	stdout.Reset()
+	stderr.Reset()
+	if err := Run([]string{"proposals", "accept", "prop-partition"}, dir, &stdout, &stderr); err != nil {
+		t.Fatalf("proposals accept failed: %v\nstderr: %s", err, stderr.String())
+	}
+
+	indexBytes, err := os.ReadFile(filepath.Join(dir, ".doc", "index.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var index indexFile
+	if err := json.Unmarshal(indexBytes, &index); err != nil {
+		t.Fatal(err)
+	}
+	for _, moduleName := range []string{"chat-workflow", "billing-workflow"} {
+		entry, ok := index.ModuleMap[moduleName]
+		if !ok {
+			t.Fatalf("moduleMap should include %s, got:\n%s", moduleName, string(indexBytes))
+		}
+		if entry.Confidence != "confirmed" || entry.Context != ".doc/modules/"+moduleName+".json" {
+			t.Fatalf("moduleMap entry for %s should be confirmed with context path, got %#v", moduleName, entry)
+		}
+	}
+
+	moduleBytes, err := os.ReadFile(filepath.Join(dir, ".doc", "modules", "chat-workflow.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	module := string(moduleBytes)
+	for _, expected := range []string{
+		`"module": "chat-workflow"`,
+		`"status": "confirmed"`,
+		`"purpose": "Owns chat user workflows."`,
+		`"conversation"`,
+		`"billing"`,
+	} {
+		if !strings.Contains(module, expected) {
+			t.Fatalf("partition should write module file containing %q, got:\n%s", expected, module)
 		}
 	}
 }

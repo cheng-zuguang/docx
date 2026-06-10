@@ -8,7 +8,7 @@
   "properties": {
     "schemaVersion": { "const": "1.0" },
     "id": { "type": "string" },
-    "type": { "type": "string", "enum": ["decision", "mistake", "module-summary", "risk-rule", "read-hint"] },
+    "type": { "type": "string", "enum": ["decision", "mistake", "module-summary", "risk-rule", "read-hint", "module-partition"] },
     "status": { "type": "string", "enum": ["pending", "accepted", "rejected"] },
     "source": { "type": "string" },
     "evidence": {

@@ -211,6 +211,8 @@ func applyProposal(root string, contextDir string, record proposalRecord) error 
 		return applyModuleSummaryProposal(root, contextDir, record)
 	case "risk-rule":
 		return applyRiskRuleProposal(root, contextDir, record)
+	case "module-partition":
+		return applyModulePartitionProposal(root, contextDir, record)
 	default:
 		return fmt.Errorf("docx proposals accept: unsupported proposal type %q", record.Type)
 	}
@@ -289,6 +291,96 @@ func applyRiskRuleProposal(root string, contextDir string, record proposalRecord
 	}
 	module.RiskRules = append(module.RiskRules, rule)
 	return writeJSON(target, module)
+}
+
+func applyModulePartitionProposal(root string, contextDir string, record proposalRecord) error {
+	target, err := resolveContextTarget(root, contextDir, record.SuggestedTarget)
+	if err != nil {
+		return err
+	}
+	if filepath.Base(target) != "index.json" {
+		return errors.New("docx proposals accept: module-partition target must be the context index")
+	}
+	index, err := readIndex(target)
+	if err != nil {
+		return err
+	}
+	modules, err := patchPartitionModules(record.SuggestedPatch)
+	if err != nil {
+		return err
+	}
+	report, err := scanProject(root)
+	if err != nil {
+		return err
+	}
+	index.ModuleMap = map[string]moduleMapEntry{}
+	docRoot := filepath.Join(root, contextDir)
+	for _, module := range modules {
+		index.ModuleMap[module.Name] = moduleMapEntry{
+			Paths:      module.Paths,
+			Context:    contextDir + "/modules/" + module.Name + ".json",
+			Confidence: "confirmed",
+		}
+		if err := writeJSON(filepath.Join(docRoot, "modules", module.Name+".json"), moduleFile{
+			SchemaVersion: schemaVersion,
+			Module:        module.Name,
+			Status:        "confirmed",
+			Paths:         module.Paths,
+			Summary: moduleSummary{
+				Purpose:       module.Purpose,
+				OwnedConcepts: module.OwnedConcepts,
+				NonGoals:      module.NonGoals,
+			},
+			Facts: moduleFacts{
+				Entrypoints:   entrypointsForModule(report.Entrypoints, module.Paths),
+				PublicAPI:     []string{},
+				Dependencies:  []string{},
+				Dependents:    []string{},
+				Tests:         testsForModule(report.TestFiles, module.Paths),
+				LastScannedAt: "",
+			},
+			ReadHints:     readHints{AlwaysRead: []string{}, ReadFor: []interface{}{}},
+			RiskRules:     []string{},
+			RecentChanges: []string{},
+		}); err != nil {
+			return err
+		}
+	}
+	return writeJSON(target, index)
+}
+
+type partitionModulePatch struct {
+	Name          string
+	Paths         []string
+	Purpose       string
+	OwnedConcepts []string
+	NonGoals      []string
+}
+
+func patchPartitionModules(patch map[string]interface{}) ([]partitionModulePatch, error) {
+	rawModules, ok := patch["modules"].([]interface{})
+	if !ok || len(rawModules) == 0 {
+		return nil, errors.New("docx proposals accept: module-partition patch requires modules")
+	}
+	modules := make([]partitionModulePatch, 0, len(rawModules))
+	for _, rawModule := range rawModules {
+		modulePatch, ok := rawModule.(map[string]interface{})
+		if !ok {
+			return nil, errors.New("docx proposals accept: module-partition module must be an object")
+		}
+		module := partitionModulePatch{
+			Name:          patchString(modulePatch, "name", ""),
+			Paths:         patchStringSlice(modulePatch, "paths"),
+			Purpose:       patchString(modulePatch, "purpose", ""),
+			OwnedConcepts: patchStringSlice(modulePatch, "ownedConcepts"),
+			NonGoals:      patchStringSlice(modulePatch, "nonGoals"),
+		}
+		if module.Name == "" || len(module.Paths) == 0 || module.Purpose == "" {
+			return nil, errors.New("docx proposals accept: module-partition modules require name, paths, and purpose")
+		}
+		modules = append(modules, module)
+	}
+	return modules, nil
 }
 
 func readProposalTargetModule(root string, contextDir string, record proposalRecord) (moduleFile, string, error) {

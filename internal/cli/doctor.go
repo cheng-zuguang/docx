@@ -71,12 +71,13 @@ func runDoctorChecks(root string) doctorReport {
 	report.Checks = append(report.Checks, checkSchemaVersion(config))
 	report.Checks = append(report.Checks, checkIndexFreshness(root, config.ContextDir))
 	report.Checks = append(report.Checks, checkAnalyzers(root, config.ContextDir))
+	report.Checks = append(report.Checks, checkAgentTasks())
 	report.Checks = append(report.Checks, checkHooks(root))
 	return report
 }
 
 func appendFallbackDoctorChecks(report doctorReport) doctorReport {
-	for _, name := range []string{"required-files", "schema-version", "indexes", "analyzers", "hooks"} {
+	for _, name := range []string{"required-files", "schema-version", "indexes", "analyzers", "agent-tasks", "hooks"} {
 		report.Checks = append(report.Checks, doctorCheck{Name: name, Status: "error", Message: "skipped because config is invalid"})
 	}
 	return report
@@ -136,10 +137,42 @@ func checkAnalyzers(root string, contextDir string) doctorCheck {
 }
 
 func checkHooks(root string) doctorCheck {
-	for _, hook := range []string{"pre-commit", "post-merge", "post-checkout"} {
-		if _, err := os.Stat(filepath.Join(root, ".git", "hooks", hook)); err == nil {
-			return doctorCheck{Name: "hooks", Status: "ok", Message: "at least one optional hook is installed"}
-		}
+	details := installedHookDetails(root)
+	if len(details) > 0 {
+		return doctorCheck{Name: "hooks", Status: "ok", Message: "at least one optional docx hook is installed", Details: details}
 	}
 	return doctorCheck{Name: "hooks", Status: "warning", Message: "optional docx hooks are not installed"}
+}
+
+func installedHookDetails(root string) []string {
+	var details []string
+	for _, hook := range []string{"pre-commit", "post-merge", "post-checkout"} {
+		if _, err := os.Stat(filepath.Join(root, ".git", "hooks", hook)); err == nil {
+			details = append(details, ".git/hooks/"+hook)
+		}
+	}
+	for _, rel := range []string{".codex/hooks.json", ".claude/settings.json"} {
+		if agentLifecycleHookInstalled(filepath.Join(root, rel)) {
+			details = append(details, rel)
+		}
+	}
+	return details
+}
+
+func agentLifecycleHookInstalled(path string) bool {
+	config, err := readHookConfig(path)
+	if err != nil {
+		return false
+	}
+	hooks := hookMap(config)
+	stopHooks := hookMatcherList(hooks["Stop"])
+	return lifecycleHookHasCommand(stopHooks, "docx finish") || lifecycleHookHasCommand(stopHooks, "docx finish --propose")
+}
+
+func checkAgentTasks() doctorCheck {
+	return doctorCheck{
+		Name:    "agent-tasks",
+		Status:  "ok",
+		Message: "semantic updates use active-agent task files",
+	}
 }

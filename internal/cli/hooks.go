@@ -6,13 +6,29 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func runInstallHook(args []string, cwd string, stdout io.Writer) error {
-	if len(args) != 1 {
+	hook := ""
+	proposeMode := false
+	for _, arg := range args {
+		switch arg {
+		case "--propose":
+			proposeMode = true
+		default:
+			if strings.HasPrefix(arg, "--") {
+				return fmt.Errorf("docx install-hook: unknown option %q", arg)
+			}
+			if hook != "" {
+				return errors.New("docx install-hook: expected hook name")
+			}
+			hook = arg
+		}
+	}
+	if hook == "" {
 		return errors.New("docx install-hook: expected hook name")
 	}
-	hook := args[0]
 	if !supportedGitHook(hook) {
 		return fmt.Errorf("docx install-hook: unsupported hook %q", hook)
 	}
@@ -28,7 +44,7 @@ func runInstallHook(args []string, cwd string, stdout io.Writer) error {
 		return err
 	}
 	path := filepath.Join(hooksDir, hook)
-	if err := upsertNamedManagedBlock(path, "# docx:start", "# docx:end", gitHookBlock(hook), 0o755); err != nil {
+	if err := upsertNamedManagedBlock(path, "# docx:start", "# docx:end", gitHookBlock(hook, proposeMode), 0o755); err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "Installed docx %s hook\n", hook)
@@ -44,10 +60,13 @@ func supportedGitHook(hook string) bool {
 	}
 }
 
-func gitHookBlock(hook string) string {
+func gitHookBlock(hook string, proposeMode bool) string {
 	command := "docx update --changed"
 	if hook == "pre-commit" {
 		command = "docx update --staged"
+	}
+	if proposeMode {
+		command += " --propose"
 	}
 	return "# docx:start\n" +
 		"# Managed by docx. Preserve this block or run `docx install-hook " + hook + "` to refresh it.\n" +

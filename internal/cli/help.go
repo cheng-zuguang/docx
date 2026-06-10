@@ -1,0 +1,251 @@
+package cli
+
+import (
+	"fmt"
+	"io"
+)
+
+func isHelpArg(arg string) bool {
+	return arg == "-h" || arg == "--help" || arg == "help"
+}
+
+func printCommandHelp(command string, w io.Writer) error {
+	switch command {
+	case "init":
+		printInitHelp(w)
+	case "scan":
+		printScanHelp(w)
+	case "update":
+		printUpdateHelp(w)
+	case "sync":
+		printSyncHelp(w)
+	case "finish":
+		printFinishHelp(w)
+	case "proposals":
+		printProposalsHelp(w)
+	case "apply":
+		printApplyHelp(w)
+	case "index":
+		printIndexHelp(w)
+	case "doctor":
+		printDoctorHelp(w)
+	case "migrate":
+		printMigrateHelp(w)
+	case "install-hook":
+		printInstallHookHelp(w)
+	case "install-agent-hook":
+		printInstallAgentHookHelp(w)
+	default:
+		return fmt.Errorf("unknown command %q", command)
+	}
+	return nil
+}
+
+func printInitHelp(w io.Writer) {
+	fmt.Fprint(w, `Initialize AI-readable project context.
+
+Usage:
+  docx init [options]
+
+Options:
+  --dir <path>              Context directory to create. Defaults to .doc.
+  --entry <file>            Entry file to update with the managed docx block. May be repeated.
+  --non-interactive         Write detected module candidates without confirming them.
+  --accept-candidates       Mark detected module candidates as confirmed.
+  --interactive             Prompt to accept, ignore, rename, or merge module candidates.
+  --summarize               Create an active-agent task for initialization summaries.
+  -h, --help                Show this help.
+
+Notes:
+  docx never invokes an agent itself. The active agent reads .doc/tmp task files,
+  writes JSON output, then applies it with docx apply init.
+`)
+}
+
+func printScanHelp(w io.Writer) {
+	fmt.Fprint(w, `Inspect project discovery output without changing semantic memory.
+
+Usage:
+  docx scan [options]
+
+Options:
+  --json                    Print the scan report as JSON.
+  --analyzer <name|path>    Analyzer to use: generic, typescript, javascript, or an executable path.
+  -h, --help                Show this help.
+`)
+}
+
+func printUpdateHelp(w io.Writer) {
+	fmt.Fprint(w, `Record code changes and refresh generated context facts.
+
+Usage:
+  docx update --staged [options]
+  docx update --changed [options]
+  docx update --since <ref> [options]
+  docx update --module <name> [options]
+
+Change sources:
+  --staged                  Record staged git changes.
+  --changed                 Record staged, unstaged, and untracked changes.
+  --since <ref>             Record changes from <ref>..HEAD.
+  --module <name>           Record a module-level context refresh without reading git diff.
+
+Options:
+  --propose                 Write an active-agent proposal task instead of updating semantic memory directly.
+  -h, --help                Show this help.
+
+Notes:
+  Most agents should let an installed lifecycle hook run docx finish, or run docx sync manually.
+  update remains available for explicit git ranges and compatibility.
+`)
+}
+
+func printSyncHelp(w io.Writer) {
+	fmt.Fprint(w, `Synchronize project context after active-agent code changes.
+
+Usage:
+  docx sync [options]
+
+Behavior:
+  Records staged, unstaged, and untracked module changes.
+  Refreshes deterministic module facts such as tests, entrypoints, and recentChanges.
+  Writes an active-agent semantic follow-up task in .doc/tmp when summaries or proposals may be needed.
+
+Options:
+  --propose                 Also create a proposal task for the active agent.
+  -h, --help                Show this help.
+`)
+}
+
+func printFinishHelp(w io.Writer) {
+	fmt.Fprint(w, `Run the active-agent end-of-turn context sync.
+
+Usage:
+  docx finish [options]
+
+Behavior:
+  Checks for staged, unstaged, and untracked files in confirmed modules.
+  Runs docx sync when module files changed.
+  Does nothing when no changed module files exist, making it safe for Stop hooks.
+
+Options:
+  --propose                 Pass --propose to docx sync when module files changed.
+  -h, --help                Show this help.
+`)
+}
+
+func printProposalsHelp(w io.Writer) {
+	fmt.Fprint(w, `Review and apply semantic update proposals.
+
+Usage:
+  docx proposals list
+  docx proposals show <id>
+  docx proposals accept <id> [--target <path>]
+  docx proposals reject <id>
+
+Subcommands:
+  list                      List pending proposals.
+  show <id>                 Show proposal details, evidence, and suggested patch.
+  accept <id>               Apply a pending proposal to its suggested target.
+  reject <id>               Mark a pending proposal as rejected.
+
+Options:
+  --target <path>           Override the target path when accepting a proposal.
+  -h, --help                Show this help.
+`)
+}
+
+func printApplyHelp(w io.Writer) {
+	fmt.Fprint(w, `Apply active-agent JSON output to docx context files.
+
+Usage:
+  docx apply init <file>
+  docx apply init --stdin
+  docx apply proposals <file>
+  docx apply proposals --stdin
+
+Subcommands:
+  init <file>               Apply project/module summaries generated by the active agent.
+  init --stdin              Read summary JSON from stdin and apply it.
+  proposals <file>          Apply semantic proposals generated by the active agent.
+  proposals --stdin         Read proposal JSON from stdin and apply it.
+
+Notes:
+  docx does not invoke agents directly; these commands apply JSON produced from
+  .doc/tmp task prompts.
+`)
+}
+
+func printIndexHelp(w io.Writer) {
+	fmt.Fprint(w, `Rebuild or check generated context indexes.
+
+Usage:
+  docx index [options]
+
+Options:
+  --check                   Verify indexes are up to date without rewriting them.
+  --section <name>          Limit work to one section: changes, proposals, decisions, or mistakes.
+  -h, --help                Show this help.
+`)
+}
+
+func printDoctorHelp(w io.Writer) {
+	fmt.Fprint(w, `Check docx installation and context health.
+
+Usage:
+  docx doctor [options]
+
+Options:
+  --json                    Print health checks as JSON.
+  --strict                  Exit with an error if any check has error status.
+  -h, --help                Show this help.
+`)
+}
+
+func printMigrateHelp(w io.Writer) {
+	fmt.Fprint(w, `Migrate docx metadata to the current schema.
+
+Usage:
+  docx migrate
+
+Options:
+  -h, --help                Show this help.
+`)
+}
+
+func printInstallHookHelp(w io.Writer) {
+	fmt.Fprint(w, `Install managed git hooks for automatic context updates.
+
+Usage:
+  docx install-hook <hook> [options]
+
+Hooks:
+  pre-commit                Run docx update --staged before commit.
+  post-merge                Run docx update --changed after merge.
+  post-checkout             Run docx update --changed after checkout.
+
+Options:
+  --propose                 Include --propose in the generated update command.
+  -h, --help                Show this help.
+`)
+}
+
+func printInstallAgentHookHelp(w io.Writer) {
+	fmt.Fprint(w, `Install managed agent lifecycle hooks.
+
+Usage:
+  docx install-agent-hook <host> [options]
+
+Hosts:
+  codex                     Install a project .codex/hooks.json Stop hook.
+  claude                    Install a project .claude/settings.json Stop hook.
+
+Behavior:
+  The installed Stop hook runs docx finish.
+  Existing hook events are preserved and repeated installs are idempotent.
+
+Options:
+  --propose                 Include --propose in the generated Stop hook.
+  -h, --help                Show this help.
+`)
+}

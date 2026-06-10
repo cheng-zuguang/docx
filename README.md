@@ -24,8 +24,8 @@ Common scenarios:
   context stays close to the code.
 - **Large or modular repositories**: use `moduleMap` to route changed files to
   focused module context.
-- **AI-assisted semantic updates**: let local AI tools propose updates while the
-  CLI keeps confirmed semantic memory behind explicit approval.
+- **AI-assisted semantic updates**: let the active agent draft proposal task
+  files while the CLI keeps confirmed semantic memory behind explicit approval.
 - **Multi-language repositories**: start with generic scanning and add analyzers
   as deeper language support becomes available.
 
@@ -80,7 +80,7 @@ go run ./cmd/docx init
 Default layout with file meanings:
 
 ```text
-.docx.json                    # CLI config: context dir, schema version, entry files, AI command settings
+.docx.json                    # CLI config: context dir, schema version, entry files
 .doc/
 |-- index.json                # Context router: project summary, readOrder, moduleMap
 |-- project.json              # Project-level generated facts and high-level summary
@@ -123,6 +123,8 @@ docx init --entry AGENTS.md --entry CLAUDE.md
 docx init --non-interactive
 docx init --accept-candidates
 docx init --interactive
+docx init --accept-candidates --summarize
+docx apply init .doc/tmp/init-summary-output.json
 ```
 
 Behavior:
@@ -134,6 +136,44 @@ Behavior:
 - When no `--entry` is provided, updates existing `AGENTS.md` / `CLAUDE.md`; if
   neither exists, creates only `AGENTS.md`.
 - Does not install git hooks by default.
+
+Agent-assisted initialization:
+
+- `--accept-candidates` accepts scanner-detected module candidates without an
+  interactive review.
+- `--summarize` writes task files (`.doc/tmp/init-summary-input.json` +
+  `.doc/tmp/init-summary-prompt.md`) for the active agent.
+- `docx` never invokes an AI command directly; the active agent writes output,
+  then you run `docx apply init`.
+- Applying agent output only writes `project.summary` and `module.summary`; it does
+  not auto-write `riskRules`, `decisions`, or `mistakes`.
+
+The agent output file should contain:
+
+```json
+{
+  "schemaVersion": "1.0",
+  "project": {
+    "summary": "AI-readable project summary."
+  },
+  "modules": [
+    {
+      "name": "chat",
+      "summary": {
+        "purpose": "Owns chat workflows.",
+        "ownedConcepts": ["messages", "threads"],
+        "nonGoals": []
+      }
+    }
+  ]
+}
+```
+
+You can also pipe the output directly:
+
+```bash
+docx apply init --stdin < .doc/tmp/init-summary-output.json
+```
 
 Interactive module confirmation:
 
@@ -174,6 +214,9 @@ docx update --since HEAD~1
 docx update --module chat
 ```
 
+`--changed` records all uncommitted changes: staged, unstaged, and untracked
+files that match confirmed modules.
+
 Typical workflows:
 
 ```bash
@@ -190,36 +233,54 @@ docx update --since main
 The command writes both machine-readable and human-readable change records under
 `.doc/changes/`, then updates affected module `recentChanges`.
 
-### `docx update --ai`
+### `docx sync`
+
+Synchronize uncommitted module context after the active agent finishes code
+changes.
+
+```bash
+docx sync
+```
+
+`sync` records staged, unstaged, and untracked changes that match confirmed
+modules, refreshes deterministic module facts, and writes
+`.doc/tmp/agent-sync.md` so the active agent can handle semantic follow-up
+deliberately.
+
+### `docx finish`
+
+Run a safe end-of-turn sync for Codex / Claude Code lifecycle hooks.
+
+```bash
+docx finish
+```
+
+`finish` checks whether there are staged, unstaged, or untracked files in
+confirmed modules. When it finds module changes, it runs `docx sync`; when
+there are no mapped module changes, it exits successfully without rewriting
+stale change context.
+
+### `docx update --propose`
 
 Generate semantic proposals without directly changing confirmed memory.
 
 ```bash
-docx update --staged --ai
-docx update --changed --ai --ai-command "codex exec --json"
-docx update --changed --ai --ai-command "ollama run qwen2.5-coder"
-docx update --since HEAD~1 --ai --ai-command "claude -p"
+docx update --staged --propose
+docx update --changed --propose
+docx update --since HEAD~1 --propose
 ```
 
-Without a local AI command, `docx` creates provider-agnostic placeholder
-proposals. With `--ai-command`, it sends stable JSON through stdin and expects a
-proposal object or proposal array on stdout.
+With `--propose`, `docx` creates task files for the active agent
+(`.doc/tmp/proposals-input.json` + `.doc/tmp/proposals-prompt.md`):
 
-You can also configure the local command in `.docx.json`:
-
-```json
-{
-  "ai": {
-    "provider": "local-command",
-    "command": "codex exec --json",
-    "timeoutSeconds": 120,
-    "contextSources": ["docx", "codegraph"],
-    "output": "proposal-json"
-  }
-}
+```bash
+docx apply proposals .doc/tmp/proposals-output.json
 ```
 
-Command-line `--ai-command` overrides `.docx.json.ai.command`.
+The agent protocol written by `docx init` reminds AI tools to let an installed
+lifecycle hook run `docx finish`; otherwise they should run `docx sync` before
+finishing. Use `docx update --changed --propose` when semantic proposals should
+be drafted by the active agent through task files.
 
 ### `docx proposals`
 
@@ -263,7 +324,8 @@ docx doctor --strict
 ```
 
 It checks config, required files, schema versions, indexes, analyzer
-capabilities, and optional hook state. `--strict` is intended for CI.
+capabilities, and optional Git or agent hook state. `--strict` is intended for
+CI.
 
 ### `docx migrate`
 
@@ -282,10 +344,16 @@ Install optional git hooks with managed blocks.
 
 ```bash
 docx install-hook pre-commit
+docx install-hook pre-commit --propose
 docx install-hook post-merge
 docx install-hook post-checkout
 ```
 
+`pre-commit` writes `docx update --staged` by default. With `--propose`, it
+writes `docx update --staged --propose` so active-agent proposal task files are created
+before commit.
+`post-merge` and `post-checkout` write `docx update --changed`, which records
+uncommitted module changes after branch movement.
 Existing hook content is preserved. Re-running the command refreshes the managed
 block without duplicating it.
 
@@ -294,6 +362,8 @@ For hook managers:
 ```bash
 # Husky pre-commit body
 docx update --staged
+# Or enable agent proposals
+docx update --staged --propose
 ```
 
 ```yaml
@@ -304,7 +374,87 @@ pre-commit:
       run: docx update --staged
 ```
 
+### `docx install-agent-hook`
+
+Install optional agent lifecycle hooks so Codex or Claude Code run `docx finish`
+on the Stop event.
+
+```bash
+docx install-agent-hook codex
+docx install-agent-hook claude
+docx install-agent-hook codex --propose
+```
+
+`codex` writes project-local `.codex/hooks.json`; `claude` writes project-local
+`.claude/settings.json`. Existing hook events are preserved, and repeated
+installs do not duplicate the `docx finish` hook. Use `--propose` when the Stop
+hook should run `docx finish --propose` and create an active-agent proposal task
+after code changes are recorded.
+
 ## End-To-End Examples
+
+### Package and Install From Local Source
+
+For local debugging only, without downloading a GitHub release:
+
+```bash
+npm run install:local
+docx --help
+```
+
+To avoid writing to the system npm global directory, install into a temporary
+prefix:
+
+```bash
+DOCX_LOCAL_PREFIX=/tmp/docx-local npm run install:local
+/tmp/docx-local/bin/docx --help
+```
+
+The script runs `go build ./cmd/docx` from the current workspace, copies the
+binary into `npm/bin-runtime/`, then installs a local `npm pack` tarball. It sets
+`DOCX_SKIP_DOWNLOAD=1` during install, so no release asset is downloaded.
+
+### Add docx to an Existing Project
+
+Run this from the root of an existing repository:
+
+```bash
+# 1. Let docx scan the project, accept detected module candidates, and write
+#    active-agent initialization task files.
+docx init --accept-candidates --summarize
+
+# 2. Let the active agent complete task, then apply the output:
+#    docx apply init .doc/tmp/init-summary-output.json
+
+# 3. Check context health and stage the context files.
+docx doctor
+git add .doc .docx.json AGENTS.md .gitignore
+git commit -m "Initialize docx project context"
+```
+
+After that, make code changes as usual and keep context fresh before committing:
+
+```bash
+git add path/to/changed/files
+docx update --staged
+git add .doc/changes .doc/modules
+git commit -m "Implement feature"
+```
+
+For ongoing AI-assisted memory updates, use proposals:
+
+```bash
+docx update --changed --propose
+# Let the active agent complete task, then apply:
+# docx apply proposals .doc/tmp/proposals-output.json
+docx proposals list
+docx proposals show <id>
+docx proposals accept <id>
+```
+
+Initialization only applies project/module summaries. Decisions, mistakes, and
+risk rules remain deliberate memory and should be accepted through proposals or
+written with user confirmation.
 
 ### Bootstrap a repository for AI agents
 
@@ -316,6 +466,19 @@ git add .doc .docx.json AGENTS.md .gitignore
 Then future agents can read `AGENTS.md`, follow the managed block to
 `.doc/index.json`, and progressively load context.
 
+To generate useful summaries during initialization:
+
+```bash
+docx init --accept-candidates --summarize
+# Let the active agent complete task, then apply:
+# docx apply init .doc/tmp/init-summary-output.json
+git add .doc .docx.json AGENTS.md .gitignore
+```
+
+This accepts module candidates and writes task files for project/module
+summary generation. Long-term judgment memory remains controlled: `riskRules`,
+`decisions`, and `mistakes` are not auto-written during initialization.
+
 ### Keep context fresh before each commit
 
 ```bash
@@ -326,17 +489,19 @@ git add .doc/changes .doc/modules
 
 This records what changed and links the change to affected modules.
 
-### Let a local AI tool suggest memory updates
+### Let the active AI agent suggest memory updates
 
 ```bash
-docx update --changed --ai --ai-command "codex exec --json"
+docx update --changed --propose
+# Let the active agent complete task, then apply:
+# docx apply proposals .doc/tmp/proposals-output.json
 docx proposals list
 docx proposals show <id>
 docx proposals accept <id>
 ```
 
-The local AI suggests semantic updates, while `docx` controls validation,
-storage, and explicit acceptance.
+The active AI suggests semantic updates, while `docx` controls validation,
+storage as proposals, and explicit acceptance.
 
 ### Recover after a merge
 
@@ -367,6 +532,6 @@ Roadmap details live in [docs/analyzers/protocol.zh-CN.md](docs/analyzers/protoc
 - [Schema docs](docs/schema/README.zh-CN.md)
 - [Schema migration](docs/migrations.zh-CN.md)
 - [Git hooks](docs/hooks.zh-CN.md)
-- [AI proposals](docs/ai-proposals.zh-CN.md)
+- [Agent proposals](docs/ai-proposals.zh-CN.md)
 - [Release workflow](docs/release.zh-CN.md)
 - [Analyzer protocol](docs/analyzers/protocol.zh-CN.md)
